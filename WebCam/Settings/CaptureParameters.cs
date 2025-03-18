@@ -16,7 +16,9 @@ public class CaptureParameters
 
     public string AudioCodec { get; set; } = "aac";
 
-    public string VideoResolution { get; set; } = "1280x720";
+    public string? VideoResolution { get; set; }
+
+    public int RTBufferSizeMb { get; set; } = 1024;
 
     public int FrameRate { get; set; } = 1;
 

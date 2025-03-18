@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Net;
+using System.Text;
 using System.Threading;
 using FFMpegCore;
 using FFMpegCore.Enums;
@@ -45,7 +46,7 @@ public class CaptureService : ICaptureService
                    .WithCustomArgument("-list_devices true")
                    .ForceFormat("dshow"))
                .OutputToFile("dummy")
-               .CancellableThrough(aCancellationToken, 1000)
+               .CancellableThrough(aCancellationToken, 10000)
                .NotifyOnError(action)
                .NotifyOnOutput(action)
                .ProcessAsynchronously();
@@ -76,20 +77,15 @@ public class CaptureService : ICaptureService
         }
 
         var filePath = Path.Combine(aParameters.OutputDir, $"{aParameters.OutFilePrefix}_{DateTime.Now.ToString("yyyy-MM-dd HH.mm.ss.avi")}");
+        var deviceOptions = GetDeviceOptions(aParameters);
+        var outputOptions = GetOutputOptions(aParameters);
 
         try
         {
             await FFMpegArguments
-                .FromDeviceInput(deviceName.ToString(), args => args
-                    .ForceFormat("dshow")
-                    .WithCustomArgument($"-video_size {aParameters.VideoResolution}"))
-                .OutputToFile(filePath, false, options => options
-                    .WithVideoCodec(FFMpeg.GetCodec(aParameters.VideoCodec))
-                    .WithAudioCodec(FFMpeg.GetCodec(aParameters.AudioCodec))
-                    .WithFramerate(aParameters.FrameRate)
-                    .WithConstantRateFactor(aParameters.ConstantRateFactor)
-                    .WithFastStart())
-                .CancellableThrough(aCancellationToken, 1000)
+                .FromDeviceInput(deviceName, deviceOptions)
+                .OutputToFile(filePath, false, outputOptions)
+                .CancellableThrough(aCancellationToken, 10000)
                 .WithLogLevel(FFMpegLogLevel.Warning)
                 .NotifyOnOutput((x) => _logger.LogInformation(x))
                 .NotifyOnError((x) => _logger.LogWarning(x))
@@ -98,7 +94,44 @@ public class CaptureService : ICaptureService
         catch (OperationCanceledException)
         {
         }
-    }    
+    }
+
+    private Action<FFMpegArgumentOptions> GetDeviceOptions(CaptureParameters aParameters)
+    {
+        return new Action<FFMpegArgumentOptions>((x) =>
+        {
+            x.ForceFormat("dshow");
+
+            if (!string.IsNullOrEmpty(aParameters.VideoDeviceName))
+            {
+                if (!string.IsNullOrEmpty(aParameters.VideoResolution))
+                {
+                    x.WithCustomArgument($"-video_size {aParameters.VideoResolution}");
+                }
+                x.WithCustomArgument($"-rtbufsize {aParameters.RTBufferSizeMb}M");                
+            }
+        });
+    }
+
+    private Action<FFMpegArgumentOptions> GetOutputOptions(CaptureParameters aParameters)
+    {
+        return new Action<FFMpegArgumentOptions>((x) =>
+        {
+            if (!string.IsNullOrEmpty(aParameters.AudioDeviceName))
+            {
+                x.WithAudioCodec(FFMpeg.GetCodec(aParameters.AudioCodec));
+            }
+
+            if (!string.IsNullOrEmpty(aParameters.VideoDeviceName))
+            {
+                x.WithVideoCodec(FFMpeg.GetCodec(aParameters.VideoCodec));
+                x.WithFramerate(aParameters.FrameRate);
+                x.WithConstantRateFactor(aParameters.ConstantRateFactor);                
+            }
+
+            x.WithFastStart();
+        });
+    }
 
     private bool CheckDevice(string aDevices, string? aDevice)
     {
@@ -116,11 +149,13 @@ public class CaptureService : ICaptureService
 
         if (!CheckDevice(devices, aParameters.AudioDeviceName))
         {
+            _logger.LogError($"Audio device {aParameters.AudioDeviceName} is not found!");
             aParameters.AudioDeviceName = string.Empty;
         }
 
         if (!CheckDevice(devices, aParameters.VideoDeviceName))
         {
+            _logger.LogError($"Video device {aParameters.VideoDeviceName} is not found!");
             aParameters.VideoDeviceName = string.Empty;
         }
     }
