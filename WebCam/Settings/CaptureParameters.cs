@@ -16,9 +16,11 @@ public class CaptureParameters
 
     public string AudioCodec { get; set; } = "aac";
 
+    public string VideoResolution { get; set; } = "1280x720";
+
     public int FrameRate { get; set; } = 1;
 
-    public int Quality { get; set; } = 20;
+    public int ConstantRateFactor { get; set; } = 23;
 
     public string OutFilePrefix { get; set; } = "cam";
 

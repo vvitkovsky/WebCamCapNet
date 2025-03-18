@@ -38,15 +38,21 @@ public class CaptureService : ICaptureService
             }
         });
 
-        await FFMpegArguments
-           .FromDeviceInput("dummy", args => args
-               .WithCustomArgument("-list_devices true")
-               .ForceFormat("dshow"))
-           .OutputToFile("dummy")
-           .CancellableThrough(aCancellationToken, 1000)
-           .NotifyOnError(action)
-           .NotifyOnOutput(action)
-           .ProcessAsynchronously();
+        try
+        {
+            await FFMpegArguments
+               .FromDeviceInput("dummy", args => args
+                   .WithCustomArgument("-list_devices true")
+                   .ForceFormat("dshow"))
+               .OutputToFile("dummy")
+               .CancellableThrough(aCancellationToken, 1000)
+               .NotifyOnError(action)
+               .NotifyOnOutput(action)
+               .ProcessAsynchronously();
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         return output.ToString();
     }
@@ -58,6 +64,8 @@ public class CaptureService : ICaptureService
             throw new ArgumentNullException(nameof(aParameters));
         }
 
+        Directory.CreateDirectory(aParameters.OutputDir);
+
         await CheckDevicesExist(aParameters, aCancellationToken);
 
         var deviceName = GetDeviceName(aParameters);
@@ -66,25 +74,30 @@ public class CaptureService : ICaptureService
             _logger.LogError("Device settings are incorrect!");
             return;
         }
-                
+
         var filePath = Path.Combine(aParameters.OutputDir, $"{aParameters.OutFilePrefix}_{DateTime.Now.ToString("yyyy-MM-dd HH.mm.ss.avi")}");
 
-        Directory.CreateDirectory(aParameters.OutputDir);
-
-        await FFMpegArguments
-            .FromDeviceInput(deviceName.ToString(), args => args
-                .ForceFormat("dshow"))
-            .OutputToFile(filePath, false, options => options
-                .WithVideoCodec(FFMpeg.GetCodec(aParameters.VideoCodec))
-                .WithFramerate(aParameters.FrameRate)
-                .WithAudioCodec(FFMpeg.GetCodec(aParameters.AudioCodec))
-                .WithCustomArgument($"-q {aParameters.Quality}")
-                .WithFastStart())
-            .CancellableThrough(aCancellationToken, 1000)
-            .WithLogLevel(FFMpegLogLevel.Info)
-            .NotifyOnOutput((x) => _logger.LogInformation(x))
-            .NotifyOnError((x) => _logger.LogWarning(x))
-            .ProcessAsynchronously();
+        try
+        {
+            await FFMpegArguments
+                .FromDeviceInput(deviceName.ToString(), args => args
+                    .ForceFormat("dshow")
+                    .WithCustomArgument($"-video_size {aParameters.VideoResolution}"))
+                .OutputToFile(filePath, false, options => options
+                    .WithVideoCodec(FFMpeg.GetCodec(aParameters.VideoCodec))
+                    .WithAudioCodec(FFMpeg.GetCodec(aParameters.AudioCodec))
+                    .WithFramerate(aParameters.FrameRate)
+                    .WithConstantRateFactor(aParameters.ConstantRateFactor)
+                    .WithFastStart())
+                .CancellableThrough(aCancellationToken, 1000)
+                .WithLogLevel(FFMpegLogLevel.Warning)
+                .NotifyOnOutput((x) => _logger.LogInformation(x))
+                .NotifyOnError((x) => _logger.LogWarning(x))
+                .ProcessAsynchronously();
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }    
 
     private bool CheckDevice(string aDevices, string? aDevice)
@@ -112,7 +125,7 @@ public class CaptureService : ICaptureService
         }
     }
         
-    private string GetDeviceName(CaptureParameters aParameters)
+    private static string GetDeviceName(CaptureParameters aParameters)
     {
         var deviceName = new StringBuilder();
 
