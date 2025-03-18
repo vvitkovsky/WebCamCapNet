@@ -1,4 +1,5 @@
 using FFMpegCore;
+using WebCam.Interfaces;
 using WebCam.Services;
 using WebCam.Settings;
 
@@ -11,11 +12,14 @@ GlobalFFOptions.Configure(new FFOptions()
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.Configure<CaptureParameters>(builder.Configuration.GetSection(nameof(CaptureParameters)));
+builder.Services.Configure<List<CaptureParameters>>(builder.Configuration.GetSection(nameof(CaptureParameters)));
 
 // Add services to the container.
-builder.Services.AddHostedService<CaptureService>();
-builder.Services.AddHostedService<DesktopCaptureService>();
+builder.Services.AddSingleton<ICaptureService, CaptureService>();
+builder.Services.AddHostedService<StartCaptureService>();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 builder.Services.AddControllers();
 
@@ -31,13 +35,18 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    app.UseDeveloperExceptionPage();
     app.MapOpenApi();
 }
 
+app.UseSwagger();
+app.UseSwaggerUI();
 app.UseHttpsRedirection();
+app.UseRouting();
 
 app.UseAuthorization();
 
+app.UseExceptionHandler("/error");
 app.MapControllers();
 
 app.Run();

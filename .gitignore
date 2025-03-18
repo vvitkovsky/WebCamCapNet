@@ -398,4 +398,4 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
-/WebCam/ffmpeg/ffmpeg.exe
+ffmpeg.exe

@@ -5,55 +5,130 @@ using FFMpegCore.Enums;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using WebCam.Interfaces;
 using WebCam.Settings;
 
 namespace WebCam.Services;
 
-public class CaptureService : BackgroundService
+public class CaptureService : ICaptureService
 {
     private readonly ILogger _logger;
-    private readonly CaptureParameters _parameters;
 
-    public CaptureService(IOptions<CaptureParameters> aParameters, ILogger<CaptureService> aLogger)
+    public CaptureService(ILogger<CaptureService> aLogger)
     {
-        _parameters = aParameters?.Value ?? throw new ArgumentNullException(nameof(aParameters));
         _logger = aLogger ?? throw new ArgumentNullException(nameof(aLogger));
     }
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    public async Task<string> ListDevices(CancellationToken aCancellationToken)
     {
-        Directory.CreateDirectory(_parameters.OutputDir);
-        var filePath = Path.Combine(_parameters.OutputDir, $"cam_{DateTime.Now.ToString("yyyy-MM-dd HH.mm.ss.avi")}");
-
-        var deviceName = new StringBuilder();
-        if (!string.IsNullOrEmpty(_parameters.VideoDeviceName))
+        var output = new StringBuilder();
+        var action = new Action<string>((x) =>
         {
-            deviceName.Append($"video=\"{_parameters.VideoDeviceName}\"");
+            if (x.Contains("dshow") && !x.Contains("Alternative name"))
+            {
+                var namePos = x.IndexOf("] ");
+
+                if (namePos > 0)
+                {
+                    namePos += 2;
+                    x = x[namePos..];
+                }
+
+                output.AppendLine(x);
+            }
+        });
+
+        await FFMpegArguments
+           .FromDeviceInput("dummy", args => args
+               .WithCustomArgument("-list_devices true")
+               .ForceFormat("dshow"))
+           .OutputToFile("dummy")
+           .CancellableThrough(aCancellationToken, 1000)
+           .NotifyOnError(action)
+           .NotifyOnOutput(action)
+           .ProcessAsynchronously();
+
+        return output.ToString();
+    }
+
+    public async Task StartCapture(CaptureParameters aParameters, CancellationToken aCancellationToken)
+    {
+        if (aParameters == null)
+        {
+            throw new ArgumentNullException(nameof(aParameters));
         }
 
-        if (!string.IsNullOrEmpty(_parameters.AudioDeviceName))
+        await CheckDevicesExist(aParameters, aCancellationToken);
+
+        var deviceName = GetDeviceName(aParameters);
+        if (string.IsNullOrEmpty(deviceName))
+        {
+            _logger.LogError("Device settings are incorrect!");
+            return;
+        }
+                
+        var filePath = Path.Combine(aParameters.OutputDir, $"{aParameters.OutFilePrefix}_{DateTime.Now.ToString("yyyy-MM-dd HH.mm.ss.avi")}");
+
+        Directory.CreateDirectory(aParameters.OutputDir);
+
+        await FFMpegArguments
+            .FromDeviceInput(deviceName.ToString(), args => args
+                .ForceFormat("dshow"))
+            .OutputToFile(filePath, false, options => options
+                .WithVideoCodec(FFMpeg.GetCodec(aParameters.VideoCodec))
+                .WithFramerate(aParameters.FrameRate)
+                .WithAudioCodec(FFMpeg.GetCodec(aParameters.AudioCodec))
+                .WithCustomArgument($"-q {aParameters.Quality}")
+                .WithFastStart())
+            .CancellableThrough(aCancellationToken, 1000)
+            .WithLogLevel(FFMpegLogLevel.Info)
+            .NotifyOnOutput((x) => _logger.LogInformation(x))
+            .NotifyOnError((x) => _logger.LogWarning(x))
+            .ProcessAsynchronously();
+    }    
+
+    private bool CheckDevice(string aDevices, string? aDevice)
+    {
+        if (!string.IsNullOrEmpty(aDevice) && !aDevices.Contains(aDevice, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogError($"Device {aDevice} is not found!");
+            return false;
+        }
+        return true;
+    }
+
+    private async Task CheckDevicesExist(CaptureParameters aParameters, CancellationToken aCancellationToken)
+    {
+        var devices = await ListDevices(aCancellationToken);
+
+        if (!CheckDevice(devices, aParameters.AudioDeviceName))
+        {
+            aParameters.AudioDeviceName = string.Empty;
+        }
+
+        if (!CheckDevice(devices, aParameters.VideoDeviceName))
+        {
+            aParameters.VideoDeviceName = string.Empty;
+        }
+    }
+        
+    private string GetDeviceName(CaptureParameters aParameters)
+    {
+        var deviceName = new StringBuilder();
+
+        if (!string.IsNullOrEmpty(aParameters.VideoDeviceName))
+        {
+            deviceName.Append($"video=\"{aParameters.VideoDeviceName}\"");
+        }
+
+        if (!string.IsNullOrEmpty(aParameters.AudioDeviceName))
         {
             if (deviceName.Length > 0)
             {
                 deviceName.Append(":");
             }
-
-            deviceName.Append($"audio=\"{_parameters.AudioDeviceName}\"");
+            deviceName.Append($"audio=\"{aParameters.AudioDeviceName}\"");
         }
-
-        return FFMpegArguments
-            .FromDeviceInput(deviceName.ToString(), args => args
-                .ForceFormat("dshow"))
-            .OutputToFile(filePath, false, options => options
-                .WithVideoCodec(FFMpeg.GetCodec(_parameters.Codec))
-                .WithFramerate(_parameters.FrameRate)
-                .WithAudioCodec(AudioCodec.Aac)
-                .WithCustomArgument($"-q {_parameters.Quality}")
-            .WithFastStart())
-            .CancellableThrough(stoppingToken, 1000)
-            .WithLogLevel(FFMpegLogLevel.Info)            
-            .NotifyOnOutput((x) => _logger.LogInformation(x))
-            .NotifyOnError((x) => _logger.LogWarning(x))
-            .ProcessAsynchronously();
+        return deviceName.ToString();
     }
 }
