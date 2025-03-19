@@ -1,4 +1,8 @@
-﻿using System.Runtime;
+﻿// <copyright file="CaptureController.cs" author="Victor Vitkovskiy">
+//     Copyright (C) Victor Vitkovskiy, Espoo Finland
+// </copyright>
+
+using System.Runtime;
 using Microsoft.AspNetCore.Mvc;
 using WebCam.Interfaces;
 
@@ -8,18 +12,18 @@ namespace WebCamCap.Controllers;
 [Route("api/v1/capture")]
 public class CaptureController : ControllerBase
 {
-    private readonly ICaptureService _captureService;
+    private readonly IListDeviceService _listDeviceService;
     private readonly ILogger _logger;
 
-    public CaptureController(ICaptureService aCaptureService, ILogger<CaptureController> aLogger)
+    public CaptureController(IListDeviceService aListDeviceService, ILogger<CaptureController> aLogger)
     {
-        _captureService = aCaptureService ?? throw new ArgumentNullException(nameof(aCaptureService));
+        _listDeviceService = aListDeviceService ?? throw new ArgumentNullException(nameof(aListDeviceService));
         _logger = aLogger ?? throw new ArgumentNullException(nameof(aLogger));
     }
 
     [HttpGet("devices")]
     public async Task<IActionResult> GetDevices()
     {
-        return Ok(await _captureService.ListDevices(CancellationToken.None));
+        return Ok(await _listDeviceService.ListDevices(CancellationToken.None));
     }
 }

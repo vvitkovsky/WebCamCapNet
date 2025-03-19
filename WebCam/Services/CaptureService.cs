@@ -1,4 +1,8 @@
-﻿using System.Net;
+﻿// <copyright file="CaptureService.cs" author="Victor Vitkovskiy">
+//     Copyright (C) Victor Vitkovskiy, Espoo Finland
+// </copyright>
+
+using System.Net;
 using System.Text;
 using System.Threading;
 using FFMpegCore;
@@ -13,49 +17,13 @@ namespace WebCam.Services;
 
 public class CaptureService : ICaptureService
 {
+    private readonly IListDeviceService _listDeviceService;
     private readonly ILogger _logger;
 
-    public CaptureService(ILogger<CaptureService> aLogger)
+    public CaptureService(IListDeviceService aListDeviceService, ILogger<CaptureService> aLogger)
     {
+        _listDeviceService = aListDeviceService ?? throw new ArgumentNullException(nameof(aListDeviceService));
         _logger = aLogger ?? throw new ArgumentNullException(nameof(aLogger));
-    }
-
-    public async Task<string> ListDevices(CancellationToken aCancellationToken)
-    {
-        var output = new StringBuilder();
-        var action = new Action<string>((x) =>
-        {
-            if (x.Contains("dshow") && !x.Contains("Alternative name"))
-            {
-                var namePos = x.IndexOf("] ");
-
-                if (namePos > 0)
-                {
-                    namePos += 2;
-                    x = x[namePos..];
-                }
-
-                output.AppendLine(x);
-            }
-        });
-
-        try
-        {
-            await FFMpegArguments
-               .FromDeviceInput("dummy", args => args
-                   .WithCustomArgument("-list_devices true")
-                   .ForceFormat("dshow"))
-               .OutputToFile("dummy")
-               .CancellableThrough(aCancellationToken, 10000)
-               .NotifyOnError(action)
-               .NotifyOnOutput(action)
-               .ProcessAsynchronously();
-        }
-        catch (OperationCanceledException)
-        {
-        }
-
-        return output.ToString();
     }
 
     public async Task StartCapture(CaptureParameters aParameters, CancellationToken aCancellationToken)
@@ -76,27 +44,30 @@ public class CaptureService : ICaptureService
             return;
         }
 
-        var filePath = Path.Combine(aParameters.OutputDir, $"{aParameters.OutFilePrefix}_{DateTime.Now.ToString("yyyy-MM-dd HH.mm.ss.avi")}");
+        var filePath = Path.Combine(aParameters.OutputDir, $"{aParameters.OutFilePrefix}_%Y-%m-%d_%H-%M-%S.avi");
         var deviceOptions = GetDeviceOptions(aParameters);
         var outputOptions = GetOutputOptions(aParameters);
 
         try
         {
-            await FFMpegArguments
+            var processor = FFMpegArguments
                 .FromDeviceInput(deviceName, deviceOptions)
                 .OutputToFile(filePath, false, outputOptions)
                 .CancellableThrough(aCancellationToken, 10000)
                 .WithLogLevel(FFMpegLogLevel.Warning)
                 .NotifyOnOutput((x) => _logger.LogInformation(x))
-                .NotifyOnError((x) => _logger.LogWarning(x))
-                .ProcessAsynchronously();
+                .NotifyOnError((x) => _logger.LogWarning(x));
+
+            _logger.LogInformation("ffmpeg.exe " + processor.Arguments);
+
+            await processor.ProcessAsynchronously();
         }
         catch (OperationCanceledException)
         {
         }
     }
 
-    private Action<FFMpegArgumentOptions> GetDeviceOptions(CaptureParameters aParameters)
+    private static Action<FFMpegArgumentOptions> GetDeviceOptions(CaptureParameters aParameters)
     {
         return new Action<FFMpegArgumentOptions>((x) =>
         {
@@ -107,13 +78,17 @@ public class CaptureService : ICaptureService
                 if (!string.IsNullOrEmpty(aParameters.VideoResolution))
                 {
                     x.WithCustomArgument($"-video_size {aParameters.VideoResolution}");
-                }
-                x.WithCustomArgument($"-rtbufsize {aParameters.RTBufferSizeMb}M");                
+                }                
+            }
+
+            if (aParameters.RTBufferSizeMb > 0)
+            {
+                x.WithCustomArgument($"-rtbufsize {aParameters.RTBufferSizeMb}M");
             }
         });
     }
 
-    private Action<FFMpegArgumentOptions> GetOutputOptions(CaptureParameters aParameters)
+    private static Action<FFMpegArgumentOptions> GetOutputOptions(CaptureParameters aParameters)
     {
         return new Action<FFMpegArgumentOptions>((x) =>
         {
@@ -126,10 +101,30 @@ public class CaptureService : ICaptureService
             {
                 x.WithVideoCodec(FFMpeg.GetCodec(aParameters.VideoCodec));
                 x.WithFramerate(aParameters.FrameRate);
-                x.WithConstantRateFactor(aParameters.ConstantRateFactor);                
+                x.WithConstantRateFactor(aParameters.ConstantRateFactor);
+                x.WithSpeedPreset(aParameters.EncodingSpeed);
+                x.WithCustomArgument("-strftime 1");
+
+                if (aParameters.IntraFrameInterval > 0)
+                {
+                    x.WithCustomArgument($"-g {aParameters.IntraFrameInterval}");
+                }
+
+                if (aParameters.SegmentTimeSec > 0)
+                {
+                    x.WithCustomArgument($"-f segment -segment_format avi -segment_time {aParameters.SegmentTimeSec} -reset_timestamps 1");
+                }
+
+                if (aParameters.SegmentMaxFileCount > 0)
+                {
+                    x.WithCustomArgument($"-segment_wrap {aParameters.SegmentMaxFileCount}");
+                }
             }
 
-            x.WithFastStart();
+            if (!string.IsNullOrEmpty(aParameters.CustomParameters))
+            {
+                x.WithCustomArgument(aParameters.CustomParameters);
+            }
         });
     }
 
@@ -145,7 +140,7 @@ public class CaptureService : ICaptureService
 
     private async Task CheckDevicesExist(CaptureParameters aParameters, CancellationToken aCancellationToken)
     {
-        var devices = await ListDevices(aCancellationToken);
+        var devices = await _listDeviceService.ListDevices(aCancellationToken);
 
         if (!CheckDevice(devices, aParameters.AudioDeviceName))
         {
@@ -159,7 +154,7 @@ public class CaptureService : ICaptureService
             aParameters.VideoDeviceName = string.Empty;
         }
     }
-        
+
     private static string GetDeviceName(CaptureParameters aParameters)
     {
         var deviceName = new StringBuilder();

@@ -1,3 +1,9 @@
+// <copyright file="Program.cs" author="Victor Vitkovskiy">
+//     Copyright (C) Victor Vitkovskiy, Espoo Finland
+// </copyright>
+
+#pragma warning disable CA1506 // Avoid excessive class coupling
+
 using FFMpegCore;
 using WebCam.Interfaces;
 using WebCam.Services;
@@ -15,6 +21,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<List<CaptureParameters>>(builder.Configuration.GetSection(nameof(CaptureParameters)));
 
 // Add services to the container.
+builder.Services.AddSingleton<IListDeviceService, ListDeviceService>();
 builder.Services.AddSingleton<ICaptureService, CaptureService>();
 builder.Services.AddHostedService<StartCaptureService>();
 
@@ -23,7 +30,6 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddControllers();
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 builder.Services.AddWindowsService();
@@ -50,3 +56,5 @@ app.UseExceptionHandler("/error");
 app.MapControllers();
 
 app.Run();
+
+#pragma warning restore CA1506 // Avoid excessive class coupling
