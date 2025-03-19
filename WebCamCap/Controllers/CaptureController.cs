@@ -2,8 +2,8 @@
 //     Copyright (C) Victor Vitkovskiy, Espoo Finland
 // </copyright>
 
-using System.Runtime;
 using Microsoft.AspNetCore.Mvc;
+using WebCam;
 using WebCam.Interfaces;
 
 namespace WebCamCap.Controllers;
@@ -25,5 +25,22 @@ public class CaptureController : ControllerBase
     public async Task<IActionResult> GetDevices()
     {
         return Ok(await _listDeviceService.ListDevices(CancellationToken.None));
+    }
+
+    [HttpGet("codecs")]
+    public IActionResult GetCodecs(CodecType aCodecType)
+    {
+        return Ok(_listDeviceService.GetCodecs(aCodecType));
+    }
+
+    [HttpGet("codec")]
+    public IActionResult GetCodecDetails(string aCodecName)
+    {
+        var details = _listDeviceService.GetCodecByName(aCodecName);
+        if (string.IsNullOrEmpty(details))
+        {
+            return NotFound();
+        }
+        return Ok(details);
     }
 }

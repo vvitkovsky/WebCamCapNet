@@ -2,11 +2,7 @@
 //     Copyright (C) Victor Vitkovskiy, Espoo Finland
 // </copyright>
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using FFMpegCore;
 using WebCam.Interfaces;
 
@@ -59,5 +55,33 @@ public class ListDeviceService : IListDeviceService
 
         _devices = output.ToString();
         return _devices;
+    }
+
+    public IList<string> GetCodecs(CodecType aType)
+    {
+        var result = new List<string>();
+        var videoCodecs = FFMpeg.GetCodecs((FFMpegCore.Enums.CodecType)aType);
+
+        foreach (var codec in videoCodecs)
+        {
+            result.Add($"Codec name: {codec.Name}, encoding: {codec.EncodingSupported}, decoding: {codec.DecodingSupported}");
+        }
+
+        return result;
+    }
+
+    public string GetCodecByName(string aCodecName)
+    {
+        if (FFMpeg.TryGetCodec(aCodecName, out var codec))
+        {
+            var details = new StringBuilder();
+            details.AppendLine($"Codec name: {codec.Name}");
+            details.AppendLine($"Encoding: {codec.EncodingSupported}");
+            details.AppendLine($"Decoding: {codec.DecodingSupported}");
+            details.Append($"Description: ");
+            details.Append(codec.Description);
+            return details.ToString();
+        }
+        return string.Empty;
     }
 }

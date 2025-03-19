@@ -4,6 +4,7 @@
 
 #pragma warning disable CA1506 // Avoid excessive class coupling
 
+using System.Text.Json.Serialization;
 using FFMpegCore;
 using WebCam.Interfaces;
 using WebCam.Services;
@@ -28,7 +29,10 @@ builder.Services.AddHostedService<StartCaptureService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 builder.Services.AddOpenApi();
 

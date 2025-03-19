@@ -2,11 +2,6 @@
 //     Copyright (C) Victor Vitkovskiy, Espoo Finland
 // </copyright>
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using FFMpegCore.Enums;
 
 namespace WebCam.Settings;

@@ -2,14 +2,10 @@
 //     Copyright (C) Victor Vitkovskiy, Espoo Finland
 // </copyright>
 
-using System.Net;
 using System.Text;
-using System.Threading;
 using FFMpegCore;
 using FFMpegCore.Enums;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using WebCam.Interfaces;
 using WebCam.Settings;
 
