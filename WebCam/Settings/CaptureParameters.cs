@@ -20,7 +20,7 @@ public class CaptureParameters
 
     public Speed SpeedPreset { get; set; } = Speed.UltraFast;
 
-    public int FrameRate { get; set; } = 1;
+    public double FrameRate { get; set; } = 1.0;
         
     public int ConstantRateFactor { get; set; } = 23;
     
