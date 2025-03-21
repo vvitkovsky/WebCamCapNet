@@ -18,7 +18,7 @@ public class CaptureParameters
 
     public string AudioCodec { get; set; } = "aac";
 
-    public Speed EncodingSpeed { get; set; } = Speed.UltraFast;
+    public Speed SpeedPreset { get; set; } = Speed.UltraFast;
 
     public int FrameRate { get; set; } = 1;
         

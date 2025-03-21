@@ -61,6 +61,10 @@ public class CaptureService : ICaptureService
         catch (OperationCanceledException)
         {
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Capture error!");
+        }
     }
 
     private static Action<FFMpegArgumentOptions> GetDeviceOptions(CaptureParameters aParameters)
@@ -98,7 +102,7 @@ public class CaptureService : ICaptureService
                 x.WithVideoCodec(FFMpeg.GetCodec(aParameters.VideoCodec));
                 x.WithFramerate(aParameters.FrameRate);
                 x.WithConstantRateFactor(aParameters.ConstantRateFactor);
-                x.WithSpeedPreset(aParameters.EncodingSpeed);
+                x.WithSpeedPreset(aParameters.SpeedPreset);
                 x.WithCustomArgument("-strftime 1");
 
                 if (aParameters.IntraFrameInterval > 0)
