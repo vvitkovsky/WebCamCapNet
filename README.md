@@ -24,3 +24,9 @@ Devices should exist, list of current devices and codecs can be checked using sw
 http://localhost:8900/swagger
 
 App can be registered as Windows service (cmd files attached).
+
+To enable NVIDIA HW encoding: 
+Codec: h264_nvenc / hevc_nvenc (NVENC encoder), encoding speed preset: slow, medium, fast
+
+To enable INTEL HW ncoding:
+Codec: h264_qsv / hevc_qsv (Intel Quick Sync), encoding speed preset: slower, slow, medium, fast, veryfast
