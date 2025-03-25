@@ -44,26 +44,29 @@ public class CaptureService : ICaptureService
         var deviceOptions = GetDeviceOptions(aParameters);
         var outputOptions = GetOutputOptions(aParameters);
 
-        try
+        while (!aCancellationToken.WaitHandle.WaitOne(5000))
         {
-            var processor = FFMpegArguments
-                .FromDeviceInput(deviceName, deviceOptions)
-                .OutputToFile(filePath, false, outputOptions)
-                .CancellableThrough(aCancellationToken, 10000)
-                .WithLogLevel(FFMpegLogLevel.Warning)
-                .NotifyOnOutput((x) => _logger.LogInformation(x))
-                .NotifyOnError((x) => _logger.LogWarning(x));
+            try
+            {
+                var processor = FFMpegArguments
+                    .FromDeviceInput(deviceName, deviceOptions)
+                    .OutputToFile(filePath, false, outputOptions)
+                    .CancellableThrough(aCancellationToken, 10000)
+                    .WithLogLevel(FFMpegLogLevel.Warning)
+                    .NotifyOnOutput((x) => _logger.LogInformation(x))
+                    .NotifyOnError((x) => _logger.LogWarning(x));
 
-            _logger.LogInformation("ffmpeg.exe " + processor.Arguments);
+                _logger.LogInformation("ffmpeg.exe " + processor.Arguments);
 
-            await processor.ProcessAsynchronously();
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Capture error!");
+                await processor.ProcessAsynchronously();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Capture error!");
+            }
         }
     }
 
