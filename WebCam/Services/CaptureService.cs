@@ -115,7 +115,7 @@ public class CaptureService : ICaptureService
 
                 if (aParameters.SegmentTimeSec > 0)
                 {
-                    x.WithCustomArgument($"-f segment -segment_format avi -segment_time {aParameters.SegmentTimeSec} -reset_timestamps 1");
+                    x.WithCustomArgument($"-f segment -segment_format avi -segment_time {aParameters.SegmentTimeSec} -segment_atclocktime 1 -reset_timestamps 1");
                 }
 
                 if (aParameters.SegmentMaxFileCount > 0)
